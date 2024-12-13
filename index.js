@@ -4,6 +4,21 @@ const cors = require('cors');
 const app = express();
 const bodyParser=require("body-parser")
 
+const mongoose = require('mongoose');
+mongoose.connect(process.env.MONGO_URI).then(data=>{
+  console.log("Conexion establecida")
+})
+
+const urlSchema=mongoose.Schema({
+  original_url : String, 
+  short_url : String
+})
+
+const Url=mongoose.model("Url",urlSchema)
+
+
+
+
 // Basic Configuration
 const port = process.env.PORT || 3000;
 
@@ -24,22 +39,37 @@ if(!/https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-
   res.json({ error : 'invalid url'});
 }else{
   req.params.longUrl=url
-  req.params.shortUrl=1
-  next()
-}
-}, (req, res)=>{
-  app.get("/api/shorturl/:url",(req2,res2)=>{
-    if(req2.params.url==req.params.shortUrl){
-      res2.redirect(req.params.longUrl)
-    }else{
-      res2.redirect("/api/shorturl")
-    }
+
+  Url.countDocuments().then(count=>{
+    console.log(count)
+    req.params.shortUrl=String(count+1)
+    next()
   })
   
-  res.json({ original_url : req.params.longUrl, short_url : req.params.shortUrl});
+}
+}, (req, res)=>{
+  const urlObj={ original_url : req.params.longUrl, short_url : req.params.shortUrl}
+  
+  const newUser=new Url(urlObj)
+  newUser.save()
+  res.json(urlObj);
 });
 
 
+app.get("/api/shorturl/:url",(req,res)=>{
+  Url.findOne({short_url:req.params.url}).then(doc=>{
+    
+    if(doc!=null){
+      if(req.params.url==doc.short_url){
+        res.redirect(doc.original_url)
+      }else{
+        res.redirect("/api/shorturl")
+      }
+    }
+    
+  })
+  
+})
 
 
 
